@@ -4,7 +4,7 @@
 
 __author__     = "Sanjay Kumar"
 __copyright__  = "Flytxt Mobile Solutions"
-__license__    = "GPL"
+__license__    = "Flytxt Mobile Solutions"
 __version__    = "0.0.1"
 __email__      = "sanjay.kumar@flytxt.com"
 __status__     = "Experimental"
@@ -83,8 +83,8 @@ path_msisdn_info = "/user/hduser/sanjay/MP/Output/MSISDN_MASTER_FILE/Month_1/*"
 path_rchg_info   = "/user/hduser/sanjay/MP/MP/recharge/MP_DFE_Recharge_event_*"
 
 #rchg data contains <number, date, value> tuples
-filter_dates = ["28-10-14","29-10-14","30-10-14","31-10-14","1-11-14","2-11-14"\
-                ,"3-11-14","4-11-14"]
+filter_dates = ["2014-10-28","2014-10-29","2014-10-30","2014-10-31","2014-11-01","2014-11-02"\
+                ,"2014-11-03","2014-11-04"]
 d = sc.textFile(path_rchg_info).coalesce(100)
 rchg_data = read_data(d,max_col_index=2,delimiter=',',num_cols=3,
             cols_list=[0,2,3])\
@@ -92,16 +92,14 @@ rchg_data = read_data(d,max_col_index=2,delimiter=',',num_cols=3,
             .filter(lambda x: (x[1].split('-')[1] in ['10','11']))
 
 #Filter subscribers who have AON > 120 days and broadcast the list to all nodes 
-msisdn = sc.textFile(path_msisdn_info).map(lambda x:x.split(','))\
-         .filter(lambda x:(int(x[2]) >=120)).map(lambda x:(x[0],0))
-m = sc.broadcast(msisdn.collectAsMap())
-
-filtered_msisdns =  rchg_data.map(lambda x: x[0],(0 if x[1] in filter_dates \
-                    else 1)).reduceByKey(add).filter(lambda x: (x[0] in m.value)\
-                    & (x[1] == 0))
+filtered_msisdns =  rchg_data.map(lambda x: (x[0],(0 if x[1] in filter_dates \
+                    else 1))).reduceByKey(add).filter(lambda x: (x[1] == 0))
 fm_bc = sc.broadcast(filtered_msisdns.collectAsMap())
-
-fm_rchg_data = rchg_data.filter(lambda x: x[0] in fm_bc).map(lambda x:\
+msisdn = sc.textFile(path_msisdn_info).map(lambda x:x.split(','))\
+         .filter(lambda x:(int(x[2]) >=120) & (x[0] in fm_bc.value)).map(lambda x:(x[0],0))
+msisdn_bc = sc.broadcast(msisdn.collectAsMap())
+fm_bc.unpersist()
+fm_rchg_data = rchg_data.filter(lambda x: x[0] in msisdn_bc.value).map(lambda x:\
                 (x[0],x[2])).reduceByKey(append)
 
 # local_og_data  = 
