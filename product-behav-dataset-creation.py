@@ -128,9 +128,8 @@ msisdn = sc.textFile(path_msisdn_info).map(lambda x:x.split(','))\
 msisdn_bc = sc.broadcast(msisdn.collectAsMap())
 fm_bc.unpersist()
 fm_rchg_data = rchg_data.filter(lambda x: x[0] in msisdn_bc.value).map(lambda x:\
-                (x[0],x[2])).reduceByKey(append).map(lambda x: x[0]+","+\
-                ";".join(map(str,x[1]))).saveAsTextFile(outpath+"fm_rchg_data")
-
+                (x[0],x[2])).reduceByKey(lambda a,b: a+","+b).map(lambda x: x[0]+","+x[1])\
+                .saveAsTextFile(outpath+"fm_rchg_data")
 
 # Create data sets with other KPIs from OG MOU CDR 
 MSIDN_index=0
@@ -201,4 +200,7 @@ post_profile_data = sc.textFile(post_profile_path).coalesce(120)\
                 x[MSIDN_index+1:]).filter(lambda x: x[MSIDN_index] in \
                 msisdn_bc.value).map(lambda x:",".join(map(str,[x[MSIDN_index], \
                 x[3],x[4],x[8]]))).saveAsTextFile(outpath+"post_profile_data")  
+
+
+d.map(lambda x:(x[0],int(x[2]))).reduceByKey(append).filter(lambda x: 0 in x[1]).count()
 
